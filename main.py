@@ -26,50 +26,75 @@ formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', 
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-#Error Logger
+##Error Log Handler
 error_handler = logging.FileHandler('error.log', encoding='utf-8')
+error_formatter = logging.Formatter('[{asctime}] {levelname}: {message}', dt_fmt, style='{')
+error_handler.setFormatter(error_formatter)
+error_logger = logging.getLogger('error_logger')
 error_handler.setLevel(logging.ERROR)
-error_handler.setFormatter(formatter)
-logger.addHandler(error_handler)
+error_logger.addHandler(error_handler)
 
 #######################################################
 ## Event Listeners
 
+## Bot is Ready
 @client.event
 async def on_ready():
+    '''Sends a msg to the console when connected and ready'''
     print(f'We have logged in as {client.user}')
 
+## Message listener
 @client.event
 async def on_message(message):
+    '''Listens for a message then does something based on the message'''
     if message.author == client.user:
         return
 
     if message.content.startswith('$hello'):
         await message.channel.send('Hello!')
 
-# Member join event
+## Member join event
 @client.event
 async def on_member_join(member):
-    channel = discord.utils.get(member.guild.channels, name='member-log')  # Replace 'general' with your desired channel
-    if channel:
-        await channel.send(f'Welcome {member.mention} to the server!')
-
-# Member leave event
+    try:
+        channel = discord.utils.get(member.guild.channels, name='member-log')
+        await channel.send(f'{member.id} {member.name} has joined the server')
+    except AttributeError:
+        error_logger.error(f"Channel 'member-log' not found or bot does not have permission to access it.")
+    except Exception as e:
+        error_logger.error(f"Unexpected error: {e}")
+        
+## Member leave event
 @client.event
 async def on_member_remove(member):
-    channel = discord.utils.get(member.guild.channels, name='member-log')  # Replace 'general' with your desired channel
-    if channel:
-        await channel.send(f'{member.mention} has left the server.')
+    try:
+        channel = discord.utils.get(member.guild.channels, name='member-log')
+        await channel.send(f'{member.id} {member.name} has left the server.')
+    except AttributeError:
+        error_logger.error(f"Channel 'member-log' not found or bot does not have permission to access it.")
+    except Exception as e:
+        error_logger.error(f"Unexpected error: {e}")
 
-# Reaction role assignment
+## Helper function to log errors
+def log_error(action, member, emoji, error):
+    error_msg = f"{action} failed. Emoji: {emoji}, User: {member.name}, Error: {error}"
+    logger.error(error_msg)
+    print(error_msg)
+
+## Reaction role functions
+ofp_emoji = '<:OFP:1259651019525193810>'
+pint_emoji = '<:pint:1259642705072357506>'
+about_us_and_rules_channel_id = 1108895281149399121
+
+#Need to add handling if member already is higher 'crusader' role
 @client.event
 async def on_raw_reaction_add(payload):
-    if payload.channel_id == 1108895281149399121:  #about-us-and-rules channel ID
+    if payload.channel_id == about_us_and_rules_channel_id:
         guild = client.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
 
         # OFP emoji selected. Assign OFP role
-        if str(payload.emoji) == '<:OFP:1259651019525193810>':
+        if str(payload.emoji) == ofp_emoji:
             role = discord.utils.get(guild.roles, name='OFP') 
             if role:
                 try:
@@ -79,7 +104,7 @@ async def on_raw_reaction_add(payload):
                     print(f"Bot doesn't have permission to add roles.")
 
         # pint emoji selected. Assign squires role
-        elif str(payload.emoji) == '<:pint:1259642705072357506>':
+        elif str(payload.emoji) == pint_emoji:
             role = discord.utils.get(guild.roles, name='Squires')
             if role:
                 try:
