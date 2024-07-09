@@ -8,6 +8,7 @@ intents.message_content = True
 intents.members = True #Enable member intent
 intents.reactions = True  # Enable reactions intent
 client = discord.Client(intents=intents)
+bot_version = '1.0'
 
 #######################################################
 ##Logging 
@@ -33,6 +34,12 @@ error_handler.setFormatter(error_formatter)
 error_logger = logging.getLogger('error_logger')
 error_handler.setLevel(logging.ERROR)
 error_logger.addHandler(error_handler)
+
+## Helper function to log errors
+def log_error(action, member, emoji, error):
+    '''Sends errors to the error_logger which is formatted to display in a uniform way'''
+    error_msg = f"{action} failed. Emoji: {emoji}, User: {member.name} (ID: {member.id}), Error: {error}"
+    error_logger.error(error_msg)
 
 #######################################################
 ## Event Listeners
@@ -63,7 +70,7 @@ async def on_member_join(member):
         error_logger.error(f"Channel 'member-log' not found or bot does not have permission to access it.")
     except Exception as e:
         error_logger.error(f"Unexpected error: {e}")
-        
+
 ## Member leave event
 @client.event
 async def on_member_remove(member):
@@ -75,43 +82,55 @@ async def on_member_remove(member):
     except Exception as e:
         error_logger.error(f"Unexpected error: {e}")
 
-## Helper function to log errors
-def log_error(action, member, emoji, error):
-    error_msg = f"{action} failed. Emoji: {emoji}, User: {member.name}, Error: {error}"
-    logger.error(error_msg)
-    print(error_msg)
 
 ## Reaction role functions
+emoji_dict = {
+    "ofp": "<:OFP:1259651019525193810>",
+    "pint": "<:pint:1259642705072357506>"
+}
 ofp_emoji = '<:OFP:1259651019525193810>'
 pint_emoji = '<:pint:1259642705072357506>'
+agree_to_rules_msg_id = 1259639530248732673
 about_us_and_rules_channel_id = 1108895281149399121
 
 #Need to add handling if member already is higher 'crusader' role
 @client.event
 async def on_raw_reaction_add(payload):
-    if payload.channel_id == about_us_and_rules_channel_id:
+    if payload.channel_id == about_us_and_rules_channel_id and payload.message_id == agree_to_rules_msg_id:
         guild = client.get_guild(payload.guild_id)
         member = guild.get_member(payload.user_id)
 
         # OFP emoji selected. Assign OFP role
         if str(payload.emoji) == ofp_emoji:
             role = discord.utils.get(guild.roles, name='OFP') 
-            if role:
-                try:
-                    await member.add_roles(role)
-                    await member.send(f'You have been given the {role.name} role!')
-                except discord.errors.Forbidden:
-                    print(f"Bot doesn't have permission to add roles.")
+            try:
+                await member.add_roles(role)
+                await member.send(f'You have been given the {role.name} role!')
+            except discord.errors.Forbidden:
+                print(f"Bot doesn't have permission to add roles.")
+            try:
+                channel = discord.utils.get(member.guild.channels, name='member-log')
+                await channel.send(f'Discord ID: {member.id}, Discord Name: {member.name} has been given the role {role}.')
+            except AttributeError:
+                error_logger.error(f"Channel 'member-log' not found or bot does not have permission to access it.")
+            except Exception as e:
+                error_logger.error(f"Unexpected error: {e}")
 
         # pint emoji selected. Assign squires role
         elif str(payload.emoji) == pint_emoji:
             role = discord.utils.get(guild.roles, name='Squires')
-            if role:
-                try:
-                    await member.add_roles(role)
-                    await member.send(f'You have been given the {role.name} role!')
-                    print("role selected")
-                except discord.errors.Forbidden:
-                    print(f"Bot doesn't have permission to add roles.")
+            print(role)
+            try:
+                await member.add_roles(role)
+                await member.send(f'You have been given the {role.name} role!')
+            except discord.errors.Forbidden:
+                print(f"Bot doesn't have permission to add roles.")
+            try:
+                channel = discord.utils.get(member.guild.channels, name='member-log')
+                await channel.send(f'Discord ID: {member.id}, Discord Name: {member.name} has been given the role {role}.')
+            except AttributeError:
+                error_logger.error(f"Channel 'member-log' not found or bot does not have permission to access it.")
+            except Exception as e:
+                error_logger.error(f"Unexpected error: {e}")
 
 client.run(os.getenv('TOKEN'))
